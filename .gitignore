@@ -1,0 +1,6 @@
+*.o
+opencl-test
+.settings
+.project
+.cproject
+IntelCL-Debug/
