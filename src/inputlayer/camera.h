@@ -21,14 +21,17 @@ class Camera
 		void convertToGray(cv::Mat&);
 		cl::Buffer* getGrayBuffer();
 		cv::Mat getGrayMat();
+		cl::Buffer* getSDR();
+		cv::Mat getSDRMat();
 	private: 
 		cv::VideoCapture device;
 		ComputeSystem *_cs;
 		ComputeProgram *_cp;
 		cl::Kernel *_kernelBGR2Gray;
+		cl::Kernel *_kernelGray2SDR;
 		cl::Buffer _bgrImage;
 		cl::Buffer _grayImage;
-		cl::Buffer _sdrImage;
+		cl::Buffer _sdr;
 		int _rows;
 		int _cols;
 };

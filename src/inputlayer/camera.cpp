@@ -4,13 +4,6 @@
 
 #include "camera.h"
 
-//Camera::Camera(ComputeSystem cs)
-//{	
-//	// Open first available camera
-//	cv::VideoCapture c = cv::VideoCapture(0);
-//}
-
-//Camera::Camera(ComputeSystem cs, cv::VideoCapture *input)
 Camera::Camera(ComputeSystem cs, int rows, int cols)
 {
 	_rows = rows;
@@ -26,10 +19,13 @@ Camera::Camera(ComputeSystem cs, int rows, int cols)
 	_cs = &cs;
 	int clret = 0;
 	_kernelBGR2Gray = new cl::Kernel(_cp->getProgram(), "BGR2Gray", &clret);
-	//_kernelBGR2Gray = new cl::Kernel(_cp->getProgram(), "BGR2GrayImage", &ret);
-	//_kernelBGR2Gray = new cl::Kernel(_cp->getProgram(), "bufferbuffer", &ret);
 	if (clret != CL_SUCCESS) {
-		throw std::runtime_error(std::string("[inputlayer/camera] Setup kernel failed, return code: " + std::to_string(clret)));
+		throw std::runtime_error(std::string("[inputlayer/camera] Setup kernel BGR2Gray failed, return code: " + std::to_string(clret)));
+	}
+
+	_kernelGray2SDR = new cl::Kernel(_cp->getProgram(), "Gray2SDR", &clret);
+	if (clret != CL_SUCCESS) {
+		throw std::runtime_error(std::string("[inputlayer/camera] Setup kernel Gray2SDR failed, return code: " + std::to_string(clret)));
 	}
 	
 	// Create buffers for original image, grayscale image, and SDR image.
@@ -39,9 +35,9 @@ Camera::Camera(ComputeSystem cs, int rows, int cols)
 	_grayImage = cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			rows * cols * sizeof(uint8_t), NULL, NULL);
 	std::cout << "Created grayImage cl::Buffer buffer" << std::endl;
-	_sdrImage = cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
+	_sdr = cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			rows * cols * sizeof(cl_uint16), NULL, NULL);
-	std::cout << "Created sdrImage cl::Buffer buffer" << std::endl;
+	std::cout << "Created sdr cl::Buffer buffer" << std::endl;
 
 	// Set BGR2Gray parameters to original image (which is expected to BGR)
 	// and Grayscale image (which is 1x8bit unsigned characters per pixel)	
@@ -49,6 +45,9 @@ Camera::Camera(ComputeSystem cs, int rows, int cols)
 	std::cout << "Set bgrImage as kernel arg 0" << std::endl;
 	_kernelBGR2Gray->setArg(1, _grayImage);
 	std::cout << "Set grayImage as kernel arg 1" << std::endl;
+
+	_kernelGray2SDR->setArg(0, _grayImage);
+	_kernelGray2SDR->setArg(1, _sdr);
 	
 }
 
@@ -114,3 +113,20 @@ cv::Mat Camera::getGrayMat()
 	return gray;
 }
 
+cl::Buffer* Camera::getSDR()
+{
+	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelGray2SDR, cl::NullRange, cl::NDRange(_rows * _cols));
+	std::cout << "getSDR Got returncode from enqueuendrangekernel: " << ret << std::endl;
+	_cs->getQueue().finish();
+	return &_sdr;
+}
+
+cv::Mat Camera::getSDRMat()
+{
+	getSDR();
+	cv::Mat sdr = cv::Mat(_rows, _cols * sizeof(cl_uchar16), CV_8UC1);
+	_cs->getQueue().enqueueReadBuffer(_sdr, CL_TRUE, 0,
+			_rows * _cols * sizeof(cl_uchar16),
+			sdr.data, NULL, NULL);
+	return sdr;
+}

@@ -10,7 +10,7 @@ EXECUTE = opencl-test
 
 all: $(EXECUTE)
 
-OBJS_E = compute-system.o compute-program.o camera.o opencl-test.o
+OBJS_E = compute-system.o compute-program.o architect.o camera.o opencl-test.o
 #OBJS_E = occlude.o stimuli.o forest.o area.o compute-system.o compute-program.o input-image.o
 
 $(EXECUTE): $(OBJS_E)
@@ -67,6 +67,14 @@ PATH_I = ./src/inputlayer/
 
 camera.o: $(PATH_I)camera.cpp
 	$(CXX) $(CFLAGS) $(PATH_I)camera.cpp
+
+# ============
+# Architect
+# ============
+PATH_A = ./src/architect/
+
+architect.o: $(PATH_A)architect.cpp
+	$(CXX) $(CFLAGS) $(PATH_A)architect.cpp
 
 # Utils
 # ==========
