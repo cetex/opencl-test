@@ -1,6 +1,7 @@
 CXX = g++
 INCLUDE = -I./src/
-CFLAGS = -c -g #-Wall
+CFLAGS = -c -g -O0 -D __CL_HPP_ENABLE_EXCEPTIONS -Wall
+LINKFLAGS = -g
 
 LDLIBS = -lOpenCL -lGL -lopencv_core -lopencv_videoio -lopencv_highgui -lopencv_imgproc -lsfml-system -lsfml-window -lsfml-graphics 
 #LDLIBS = -lOpenCL -lGL -lsfml-system -lsfml-window -lsfml-graphics -lopencv_core -lopencv_videoio -lopencv_highgui -lopencv_imgproc -lopencv_imgcodecs 
@@ -9,11 +10,11 @@ EXECUTE = opencl-test
 
 all: $(EXECUTE)
 
-OBJS_E = opencl-test.o
+OBJS_E = compute-system.o compute-program.o camera.o opencl-test.o
 #OBJS_E = occlude.o stimuli.o forest.o area.o compute-system.o compute-program.o input-image.o
 
 $(EXECUTE): $(OBJS_E)
-	$(CXX) $(OBJS_E) $(LDLIBS) -o $(EXECUTE)
+	$(CXX) $(LINKFLAGS) $(OBJS_E) $(LDLIBS) -o $(EXECUTE)
 
 # ============
 # opencl-test
@@ -51,15 +52,22 @@ opencl-test.o: $(PATH_O)/opencl-test.cpp
 # ==========
 # Compute
 # ==========
-#PATH_C = ./source/compute/
-#
-#compute-system.o: $(PATH_C)compute-system.cpp
-#	$(CXX) $(CFLAGS) $(PATH_C)compute-system.cpp
-#
-#compute-program.o: $(PATH_C)compute-program.cpp
-#	$(CXX) $(CFLAGS) $(PATH_C)compute-program.cpp
+PATH_C = ./src/compute/
 
-# ==========
+compute-system.o: $(PATH_C)compute-system.cpp
+	$(CXX) $(CFLAGS) $(PATH_C)compute-system.cpp
+
+compute-program.o: $(PATH_C)compute-program.cpp
+	$(CXX) $(CFLAGS) $(PATH_C)compute-program.cpp
+
+# ============
+# InputLayers
+# ============
+PATH_I = ./src/inputlayer/
+
+camera.o: $(PATH_I)camera.cpp
+	$(CXX) $(CFLAGS) $(PATH_I)camera.cpp
+
 # Utils
 # ==========
 #PATH_U = ./source/utils/
@@ -73,4 +81,4 @@ opencl-test.o: $(PATH_O)/opencl-test.cpp
 # ==========
 .PHONY : clean
 clean:
-	rm -rf *o $(EXECUTE)
+	rm -rf *.o $(EXECUTE)

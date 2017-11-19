@@ -147,7 +147,7 @@ __kernel void BGR2SDR(__global uchar *gray, __global uchar16 *SDR) {
 
 ushort8 getNeuron(uint *pos, ushort8 *data) {
 	return data[*pos];
-				   //(pixelHeight * neurons_dendrites_width) + (pixelWidth * 16)
+	//(pixelHeight * neurons_dendrites_width) + (pixelWidth * 16)
 }
 
 uint getColumnRow(uint *row, uint *step, uint *col) {
