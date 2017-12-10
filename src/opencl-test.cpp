@@ -28,15 +28,21 @@ int main( int argc, char** argv )
 
 	Camera cap1 = Camera(cs, 120, 160);
 	//Architect arch = Architect(cs, 120, 160);
+	cv::namedWindow("cap1_orig", cv::WINDOW_NORMAL);
 	cv::namedWindow("cap1_gray", cv::WINDOW_NORMAL);
 	cv::namedWindow("cap1_sdr", cv::WINDOW_NORMAL);
 	while (true) {
+		cv::Mat image = cap1.getNewImage();
 		std::cout << "Image Size: " << cap1.getSize() << ", Gray Size: " << cap1.getGraySize() << ", SDR size: " << cap1.getSdrSize() << std::endl;
-		cv::Mat image = cap1.getGrayMat();
+		cv::Mat gray = cap1.getGrayMat();
+		std::cout << "Got gray mat" << std::endl;
 		cv::Mat sdr = cap1.getSDRMat();
+		std::cout << "Got sdr mat" << std::endl;
 
-       		cv::imshow("cap1_gray", image);
-		cv::resizeWindow("cap1_gray", image.cols, image.rows);
+		cv::imshow("cap1_orig", image);
+		cv::resizeWindow("cap1_orig", image.cols, image.rows);
+       		cv::imshow("cap1_gray", gray);
+		cv::resizeWindow("cap1_gray", gray.cols, gray.rows);
 		cv::imshow("cap1_sdr", sdr);
 		cv::resizeWindow("cap1_sdr", sdr.cols, sdr.rows);
 

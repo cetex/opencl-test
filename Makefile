@@ -8,7 +8,7 @@ OUT = opencl-test
 
 LDLIBS = -lOpenCL -lGL -lopencv_core -lopencv_videoio -lopencv_highgui -lopencv_imgproc -lsfml-system -lsfml-window -lsfml-graphics 
 
-_OBJS = compute/compute-system.o compute/compute-program.o architect/architect.o inputlayer/camera.o opencl-test.o
+_OBJS = compute/compute-system.o compute/compute-program.o architect/architect.o inputlayer/camera.o inputlayer/inputlayer.o opencl-test.o
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
 $(ODIR)/%.o: $(SDIR)/%.cpp

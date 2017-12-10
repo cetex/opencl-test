@@ -120,11 +120,10 @@ uchar16 ucharToSDR(uchar data) {
 
 
 
-kernel void Gray2SDR(global uchar *gray, global uchar16 *SDR) {
+kernel void Input2SDR(global uchar *Input, global uchar16 *SDR) {
         int pos = get_global_id(0);
-        SDR[pos] = ucharToSDR(gray[pos]);
+        SDR[pos] = ucharToSDR(Input[pos]);
 
-        //uchar gray = bgr[pos.x * pos.y].B * 0.114f + bgr[pos.x * pos.y].G * 0.587f + bgr[pos.x * pos.y].R * 0.299f;
         //0-15    = 0b0000000000000011
         //16-31   = 0b0000000000000110
         //32-47   = 0b0000000000001100
