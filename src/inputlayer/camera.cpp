@@ -6,8 +6,8 @@
 
 Camera::Camera(ComputeSystem cs, int rows, int cols)
 {
-	_rows = rows;
-	_cols = cols;
+	_camSize.x = rows;
+	_camSize.y = cols;
 
 	device = cv::VideoCapture(0);
 	if (!device.isOpened())
@@ -30,13 +30,13 @@ Camera::Camera(ComputeSystem cs, int rows, int cols)
 	
 	// Create buffers for original image, grayscale image, and SDR image.
 	_bgrImage = cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
-			rows * cols * 3 * sizeof(uint8_t), NULL, NULL);
+			_camSize.x * _camSize.y * 3 * sizeof(uint8_t), NULL, NULL);
 	std::cout << "Created bgrImage cl::buffer buffer" << std::endl;
 	_grayImage = cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
-			rows * cols * sizeof(uint8_t), NULL, NULL);
+			_camSize.x * _camSize.y * sizeof(uint8_t), NULL, NULL);
 	std::cout << "Created grayImage cl::Buffer buffer" << std::endl;
 	_sdr = cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
-			rows * cols * sizeof(cl_uint16), NULL, NULL);
+			_camSize.x * _camSize.y * sizeof(cl_uint16), NULL, NULL);
 	std::cout << "Created sdr cl::Buffer buffer" << std::endl;
 
 	// Set BGR2Gray parameters to original image (which is expected to BGR)
@@ -61,7 +61,7 @@ cv::Mat Camera::getNewImage()
 	}
 	std::cout << "Image read, got: " << tmpImage.size() << ", " << tmpImage.channels() << std::endl;
 	// Create new cv::Mat placeholder for new image of size rows x cols
-        cv::Mat image(_rows, _cols, tmpImage.type());
+        cv::Mat image(_camSize.x, _camSize.y, tmpImage.type());
 	std::cout << "Create new scaled image-holder" << std::endl;
 	// Resize original image to new image size
         cv::resize(tmpImage, image, image.size(), 0, 0, CV_INTER_LINEAR);
@@ -74,12 +74,12 @@ cv::Mat Camera::getNewImage()
 void Camera::convertToGray(cv::Mat &image)
 {
 	_cs->getQueue().enqueueWriteBuffer(_bgrImage, CL_TRUE, 0,
-			_rows * _cols * 3 * sizeof(uint8_t),
+			_camSize.x * _camSize.y * 3 * sizeof(uint8_t),
 			image.data, NULL, NULL);
 	std::cout << "Wrote bgrImage to cl device, first value: " << image.data[0] << std::endl;
 
 	// Run the kernel
-	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelBGR2Gray, cl::NullRange, cl::NDRange(_rows * _cols));
+	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelBGR2Gray, cl::NullRange, cl::NDRange(_camSize.x * _camSize.y));
 	std::cout << "Got returncode from enqueuendrangekernel: " << ret << std::endl;
 
 }
@@ -100,10 +100,10 @@ cv::Mat Camera::getGrayMat()
 	// Write resized image to bgrImage buffer
 
 	// Create placeholder for returned grayscale imge (8unsigned characters, 1 channel per pixel)
-	cv::Mat gray = cv::Mat(_rows, _cols, CV_8UC1);
+	cv::Mat gray = cv::Mat(_camSize.x, _camSize.y, CV_8UC1);
 	// Read back grayscale image from buffer
 	_cs->getQueue().enqueueReadBuffer(_grayImage, CL_TRUE, 0,
-			_rows * _cols * sizeof(uint8_t),
+			_camSize.x * _camSize.y * sizeof(uint8_t),
 			gray.data, NULL, NULL);
         //_cs->getQueue().enqueueReadImage(bgrImage, CL_TRUE, grayOrigin, grayRegion, 0, 0, image.data);
 	std::cout << "Got image back from cl device, first value: " << gray.data[0] << std::endl;
@@ -115,7 +115,7 @@ cv::Mat Camera::getGrayMat()
 
 cl::Buffer* Camera::getSDR()
 {
-	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelGray2SDR, cl::NullRange, cl::NDRange(_rows * _cols));
+	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelGray2SDR, cl::NullRange, cl::NDRange(_camSize.x * _camSize.y));
 	std::cout << "getSDR Got returncode from enqueuendrangekernel: " << ret << std::endl;
 	_cs->getQueue().finish();
 	return &_sdr;
@@ -124,9 +124,9 @@ cl::Buffer* Camera::getSDR()
 cv::Mat Camera::getSDRMat()
 {
 	getSDR();
-	cv::Mat sdr = cv::Mat(_rows, _cols * sizeof(cl_uchar16), CV_8UC1);
+	cv::Mat sdr = cv::Mat(_camSize.x, _camSize.y  * sizeof(cl_uchar16), CV_8UC1);
 	_cs->getQueue().enqueueReadBuffer(_sdr, CL_TRUE, 0,
-			_rows * _cols * sizeof(cl_uchar16),
+			_camSize.x * _camSize.y * sizeof(cl_uchar16),
 			sdr.data, NULL, NULL);
 	return sdr;
 }
