@@ -70,6 +70,10 @@ void InputLayer::input2SDR() {
 	std::cout << "getSDR Got returncode from enqueuendrangekernel: " << ret << std::endl;
 }
 
+void InputLayer::stepOne() {
+	input2SDR();
+}
+
 /*
  * getSDRMat returns a cv::Mat of the sdr buffer
  */

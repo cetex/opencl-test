@@ -19,8 +19,11 @@ class Camera : public InputLayer
 {
 	public:
 		Camera(ComputeSystem &cs, int rows, int cols);
-		cv::Mat getNewImage();
-		void convertToGray(cv::Mat&);
+		void captureNewImage();
+		void convertToGray();
+		void stepOne();
+
+		cv::Mat getImageMat();
 		cl::Buffer* getGrayBuffer();
 		cv::Mat getGrayMat();
 
@@ -34,6 +37,7 @@ class Camera : public InputLayer
 		cv::VideoCapture device;
 		ComputeProgram *_cp = NULL;
 		cl::Kernel *_kernelBGR2Gray = NULL;
+		cv::Mat _image;
 		cl::Buffer *_bgrImage;
 		cl::Buffer *_grayImage;
 		HTM::Vec2i _camDim;

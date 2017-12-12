@@ -48,7 +48,7 @@ Camera::Camera(ComputeSystem &cs, int rows, int cols) : HTM::InputLayer(cs, rows
 	std::cout << "Set grayImage as kernel arg 1" << std::endl;
 }
 
-cv::Mat Camera::getNewImage()
+void Camera::captureNewImage()
 {
         // Create temporary image
         cv::Mat tmpImage;
@@ -61,34 +61,38 @@ cv::Mat Camera::getNewImage()
 	std::cout << "Image read, got: " << tmpImage.size() << ", " << tmpImage.channels() << std::endl;
 
 	// Create new cv::Mat (image) placeholder with correct size (rows (x) * cols (y))
-        cv::Mat image(_camDim.x, _camDim.y, tmpImage.type());
+        _image = cv::Mat(_camDim.x, _camDim.y, tmpImage.type());
 
 	// Resize original image to new image size
-        cv::resize(tmpImage, image, image.size(), 0, 0, CV_INTER_LINEAR);
+        cv::resize(tmpImage, _image, _image.size(), 0, 0, CV_INTER_LINEAR);
 	std::cout << "resized image" << std::endl;
-	std::cout << "Image type is: " << std::to_string(image.type()) << std::endl;
-
-	// Since we've captured one frame, may as well convert it to grayscale
-	convertToGray(image);
-	
-	// Also convert it to SDR
-	input2SDR();
-
-	return image;
+	std::cout << "Image type is: " << std::to_string(_image.type()) << std::endl;
 }
 
-void Camera::convertToGray(cv::Mat &image)
+cv::Mat Camera::getImageMat()
+{
+	return _image;
+}
+
+void Camera::convertToGray()
 {
 	// Copy image into opencl memory buffer
 	std::cout << "Writing image to _bgrImage cl::buffer" << std::endl;
 	_cs->getQueue().enqueueWriteBuffer(*_bgrImage, CL_TRUE, 0,
 			_camDim.x * _camDim.y * 3 * sizeof(uint8_t),
-			image.data, NULL, NULL);
-	std::cout << "Wrote bgrImage to cl device, first value: " << image.data[0] << std::endl;
+			_image.data, NULL, NULL);
+	std::cout << "Wrote bgrImage to cl device, first value: " << _image.data[0] << std::endl;
 
 	// Run the opencl kernel which converts it to grayscale for us
 	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelBGR2Gray, cl::NullRange, cl::NDRange(_camDim.x * _camDim.y));
 	std::cout << "Got returncode from enqueuendrangekernel: " << ret << std::endl;
+}
+
+void Camera::stepOne()
+{
+	captureNewImage();
+	convertToGray();
+	InputLayer::stepOne();
 }
 
 cl::Buffer* Camera::getGrayBuffer()

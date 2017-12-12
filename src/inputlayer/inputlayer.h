@@ -21,6 +21,7 @@ class InputLayer
 		void setInputData(cl::Buffer *inputData);
 		cv::Mat getSDRMat();
 		void input2SDR();
+		void stepOne();
 
 		cl::Buffer* getSDRBuff() {
 			return _sdrBuff;

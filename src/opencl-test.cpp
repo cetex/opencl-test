@@ -37,7 +37,8 @@ int main( int argc, char** argv )
 	// Loop forever
 	while (true) {
 		// Grab new image from webcam (data from inputlayer)
-		cv::Mat image = cap1.getNewImage();
+		cap1.stepOne();
+		cv::Mat image = cap1.getImageMat();
 		std::cout << "Image Size: " << cap1.getDim() << ", Gray Size: " << cap1.getGrayDim() << ", SDR size: " << cap1.getSDRDim() << std::endl;
 		
 		// Grab the grayscale image
