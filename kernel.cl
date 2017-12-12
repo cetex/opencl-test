@@ -1,18 +1,4 @@
-#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
-
-typedef struct tag_PixelBGR {
-	unsigned char B;
-	unsigned char G;
-	unsigned char R;
-}PixelBGR;
-
-
-__kernel void BGR2GRAY(__global PixelBGR *bgr, __global uchar *gray) {
-	int pos = get_global_id(0);
-	gray[pos] = bgr[pos].B * 0.114f + bgr[pos].G * 0.587f + bgr[pos].R * 0.299f;
-}
-
-
+//#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 
 uchar16 ucharToSDR(uchar data) {
 	if (data < 128) {
@@ -111,7 +97,7 @@ uchar16 ucharToSDR(uchar data) {
 }
 
 
-__kernel void BGR2SDR(__global uchar *gray, __global uchar16 *SDR) {
+__kernel void Input2SDR(__global uchar *gray, __global uchar16 *SDR) {
 	int pos = get_global_id(0);
 	//__local uchar4 lsdr;
 	//lsdr = SDR[pos.x*pos.y/4];
@@ -171,7 +157,7 @@ typedef struct nnDimensions {
 	int numActiveColumnsPerInhArea;
 } mynnDimensions;
 
-__kernel void ColumnOverlap(__global uchar16 *SDR, __global uchar16 *spatial_weights, __global uchar *columns, __global mynnDimensions *params) {
+__kernel void CalculateOverlap(__global uchar16 *SDR, __global uchar16 *spatial_weights, __global uchar *columns, __global mynnDimensions *params) {
 	__private uint2 col;
 	col.x = get_global_id(0);
 	col.y = get_global_id(1);

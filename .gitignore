@@ -1,4 +1,5 @@
 *.o
+*.swp
 opencl-test
 .settings
 .project

@@ -14,6 +14,7 @@
 #include "../utils/utils.h"
 #include <iostream>
 
+namespace HTM {
 class Camera : public InputLayer
 {
 	public:
@@ -23,11 +24,11 @@ class Camera : public InputLayer
 		cl::Buffer* getGrayBuffer();
 		cv::Mat getGrayMat();
 
-		Vec2i getSize() {
-			return _camSize;
+		HTM::Vec2i getDim() {
+			return _camDim;
 		}
-		Vec2i getGraySize() {
-			return _graySize;
+		HTM::Vec2i getGrayDim() {
+			return _grayDim;
 		}
 	private: 
 		cv::VideoCapture device;
@@ -35,7 +36,8 @@ class Camera : public InputLayer
 		cl::Kernel *_kernelBGR2Gray = NULL;
 		cl::Buffer *_bgrImage;
 		cl::Buffer *_grayImage;
-		Vec2i _camSize;
-		Vec2i _graySize;
+		HTM::Vec2i _camDim;
+		HTM::Vec2i _grayDim;
+};
 };
 #endif

@@ -9,9 +9,9 @@
 #include <iostream>
 #include <unistd.h>
 #include "compute/compute-system.h"
-#include "compute/compute-program.h"
-#include "utils/utils.h"
 #include "inputlayer/camera.h"
+#include "htm/region.h"
+#include "utils/utils.h"
 //#include "architect/architect.h"
 #include <opencv2/highgui/highgui.hpp>
 
@@ -22,23 +22,33 @@ int main( int argc, char** argv )
 	// Setup ComputeSystem
 	ComputeSystem cs = ComputeSystem(ComputeSystem::_gpu);
 	cs.printCLInfo();
-	// Setup ComputeProgram
-	//const std::string fileName = getcwd_string() + std::string("/kernel.cl");
-	//ComputeProgram cp = ComputeProgram(cs, fileName);
 
-	Camera cap1 = Camera(cs, 120, 160);
-	//Architect arch = Architect(cs, 120, 160);
+	// Create inputlayer, camera
+	HTM::Camera cap1 = HTM::Camera(cs, 120, 160);
+
+	// Create region using camera
+	HTM::Region region = HTM::Region(cs, cap1, HTM::Vec2i(240, 320), HTM::Vec2i(16, 16));
+
+	// Create OpenCV windows for the different steps the data passes through.
 	cv::namedWindow("cap1_orig", cv::WINDOW_NORMAL);
 	cv::namedWindow("cap1_gray", cv::WINDOW_NORMAL);
 	cv::namedWindow("cap1_sdr", cv::WINDOW_NORMAL);
+
+	// Loop forever
 	while (true) {
+		// Grab new image from webcam (data from inputlayer)
 		cv::Mat image = cap1.getNewImage();
-		std::cout << "Image Size: " << cap1.getSize() << ", Gray Size: " << cap1.getGraySize() << ", SDR size: " << cap1.getSdrSize() << std::endl;
+		std::cout << "Image Size: " << cap1.getDim() << ", Gray Size: " << cap1.getGrayDim() << ", SDR size: " << cap1.getSDRDim() << std::endl;
+		
+		// Grab the grayscale image
 		cv::Mat gray = cap1.getGrayMat();
 		std::cout << "Got gray mat" << std::endl;
+
+		// Get the SDR for the Grayscale image
 		cv::Mat sdr = cap1.getSDRMat();
 		std::cout << "Got sdr mat" << std::endl;
 
+		// Update the windows with the new images, rescale them as well
 		cv::imshow("cap1_orig", image);
 		cv::resizeWindow("cap1_orig", image.cols, image.rows);
        		cv::imshow("cap1_gray", gray);
@@ -46,8 +56,11 @@ int main( int argc, char** argv )
 		cv::imshow("cap1_sdr", sdr);
 		cv::resizeWindow("cap1_sdr", sdr.cols, sdr.rows);
 
+		// Sleep for 10ms, not sure this is even needed as the framerate of the camera should slow us down significantly.
 		usleep(10000);
-                if(cv::waitKey(1) == 27) break; // check for esc key
+
+		// Check for esc key
+                if(cv::waitKey(1) == 27) break;
 	}
 	return 0;
 }

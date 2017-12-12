@@ -3,13 +3,14 @@
 // ==============
 
 #include "camera.h"
+namespace HTM {
 
-Camera::Camera(ComputeSystem &cs, int rows, int cols) : InputLayer(cs, rows, cols)
+Camera::Camera(ComputeSystem &cs, int rows, int cols) : HTM::InputLayer(cs, rows, cols)
 {
-	_camSize.x = rows;
-	_camSize.y = cols;
-	_graySize.x = rows;
-	_graySize.y = cols;
+	_camDim.x = rows;
+	_camDim.y = cols;
+	_grayDim.x = rows;
+	_grayDim.y = cols;
 
 	// Setup video first found video-capture device	
 	device = cv::VideoCapture(0);
@@ -30,12 +31,12 @@ Camera::Camera(ComputeSystem &cs, int rows, int cols) : InputLayer(cs, rows, col
 
 	// Create opencl buffer for original image
 	_bgrImage = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
-			_camSize.x * _camSize.y * 3 * sizeof(uint8_t), NULL, NULL);
+			_camDim.x * _camDim.y * 3 * sizeof(uint8_t), NULL, NULL);
 	std::cout << "Created bgrImage cl::buffer buffer" << std::endl;
 
 	// Buffer for grayscale image
 	_grayImage = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
-			_camSize.x * _camSize.y * sizeof(uint8_t), NULL, NULL);
+			_camDim.x * _camDim.y * sizeof(uint8_t), NULL, NULL);
 	setInputData(_grayImage);
 	std::cout << "Created InputData (Grayscale cl::Buffer) for inputlayer" << std::endl;
 
@@ -60,7 +61,7 @@ cv::Mat Camera::getNewImage()
 	std::cout << "Image read, got: " << tmpImage.size() << ", " << tmpImage.channels() << std::endl;
 
 	// Create new cv::Mat (image) placeholder with correct size (rows (x) * cols (y))
-        cv::Mat image(_camSize.x, _camSize.y, tmpImage.type());
+        cv::Mat image(_camDim.x, _camDim.y, tmpImage.type());
 
 	// Resize original image to new image size
         cv::resize(tmpImage, image, image.size(), 0, 0, CV_INTER_LINEAR);
@@ -69,9 +70,11 @@ cv::Mat Camera::getNewImage()
 
 	// Since we've captured one frame, may as well convert it to grayscale
 	convertToGray(image);
+	
+	// Also convert it to SDR
+	input2SDR();
 
 	return image;
-
 }
 
 void Camera::convertToGray(cv::Mat &image)
@@ -79,12 +82,12 @@ void Camera::convertToGray(cv::Mat &image)
 	// Copy image into opencl memory buffer
 	std::cout << "Writing image to _bgrImage cl::buffer" << std::endl;
 	_cs->getQueue().enqueueWriteBuffer(*_bgrImage, CL_TRUE, 0,
-			_camSize.x * _camSize.y * 3 * sizeof(uint8_t),
+			_camDim.x * _camDim.y * 3 * sizeof(uint8_t),
 			image.data, NULL, NULL);
 	std::cout << "Wrote bgrImage to cl device, first value: " << image.data[0] << std::endl;
 
 	// Run the opencl kernel which converts it to grayscale for us
-	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelBGR2Gray, cl::NullRange, cl::NDRange(_camSize.x * _camSize.y));
+	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelBGR2Gray, cl::NullRange, cl::NDRange(_camDim.x * _camDim.y));
 	std::cout << "Got returncode from enqueuendrangekernel: " << ret << std::endl;
 }
 
@@ -96,14 +99,16 @@ cl::Buffer* Camera::getGrayBuffer()
 cv::Mat Camera::getGrayMat()
 {
 	// Create placeholder for returned grayscale imge from opencl (8bit Unsigned Char, 1 color-channel per pixel)
-	cv::Mat gray = cv::Mat(_camSize.x, _camSize.y, CV_8UC1);
+	cv::Mat gray = cv::Mat(_camDim.x, _camDim.y, CV_8UC1);
 
 	// Read back grayscale image from buffer
 	_cs->getQueue().enqueueReadBuffer(*_grayImage, CL_TRUE, 0,
-		_camSize.x * _camSize.y * sizeof(uint8_t),
+		_camDim.x * _camDim.y * sizeof(uint8_t),
 		gray.data, NULL, NULL);
 	std::cout << "Got image back from cl device, first value: " << gray.data[0] << std::endl;
 	std::cout << "gray is of type: " << std::to_string(gray.type()) << std::endl;
 	std::cout << "Read back grayImage" << std::endl;
 	return gray;
 }
+
+};

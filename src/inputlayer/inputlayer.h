@@ -12,19 +12,27 @@
 #include "../utils/utils.h"
 #include <iostream>
 
+namespace HTM {
+
 class InputLayer
 {
 	public:
-		InputLayer(ComputeSystem &cs, int _rows, int _cols);
+		InputLayer(ComputeSystem &cs, int rows, int cols);
 		void setInputData(cl::Buffer *inputData);
-		cl::Buffer* getSDR();
 		cv::Mat getSDRMat();
+		void input2SDR();
 
-		Vec2i getInputSize() {
-			return _inputSize;
+		cl::Buffer* getSDRBuff() {
+			return _sdrBuff;
+		};
+		cl::Buffer* getSDRBuffDim() {
+			return _sdrBuffDim;
 		}
-		Vec2i getSdrSize() {
-			return _sdrSize;
+		Vec2i getInputDim() {
+			return _inputDim;
+		}
+		Vec2i getSDRDim() {
+			return _sdrDim;
 		}
 	protected:
 		ComputeSystem *_cs = NULL;
@@ -32,8 +40,10 @@ class InputLayer
 		ComputeProgram *_cp = NULL;
 		cl::Kernel *_kernelInput2SDR;
 		cl::Buffer *_inputData;
-		cl::Buffer *_sdr;
-		Vec2i _inputSize;
-		Vec2i _sdrSize;
+		cl::Buffer *_sdrBuff;
+		cl::Buffer *_sdrBuffDim;
+		Vec2i _inputDim;
+		Vec2i _sdrDim;
+};
 };
 #endif
