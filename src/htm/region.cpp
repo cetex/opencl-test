@@ -26,65 +26,136 @@ Region::Region(ComputeSystem &cs, InputLayer &input, Vec2i columnsDim, Vec2i col
 
 	// Set dimensions of columns
 	_columnsDim = Vec2i(columnsDim.x, columnsDim.y);
-	
-	// Set the Input-dimensions that each column sees (each column only sees a subset of the input SDR)
+	cl_uint columnsBuffDim[2] = { _columnsDim.x, _columnsDim.y };
+
+	// Set the Radius that each column sees (each column only sees a subset of the input SDR)
 	_columnInputDim = Vec2i(columnInputDim.x, columnInputDim.y);
-	
+	cl_uint columnInputBuffRadius[2] = { _columnInputDim.x, _columnInputDim.y };
+
+	// Proximal dendrites (feed forward to column from SDR)
+	// Multiply size of SDR by the radius each column sees. (input.size * columnInput)
+	_proximalDendritesDim = Vec2i(_input->getSDRDim().x * _columnInputDim.x, _input->getSDRDim().y * _columnInputDim.y);
+
+
+	cl_uint proximalDendritesBuffDim[2] = { _proximalDendritesDim.x, _proximalDendritesDim.y };
+
+	// Create proximalDendritesBuffRand with initial, random, values.
+	std::mt19937::result_type seed = time(0);
+	auto _rand = std::bind(std::uniform_int_distribution<int>(80, 160), std::mt19937(seed));
+
+	uint8_t *proximalDendritesBuffRand = new uint8_t[_proximalDendritesDim.x * _proximalDendritesDim.y];
+	for (unsigned int i = 0; i < (_proximalDendritesDim.x * _proximalDendritesDim.y); i++) {
+		proximalDendritesBuffRand[i] = _rand();
+	}
+
 	// Create memory-buffer for columns
 	_columnsBuff = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			_columnsDim.x * _columnsDim.y * sizeof(uint8_t), NULL, NULL);
-	std::cout << "Created Columns cl::Buffer buffer of size: " << _columnsDim.x * _columnsDim.y << std::endl;
 	
 	// Create memory-buffer for columns dimensions (x, y)
-	_columnsBuffDim = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
+	_columnsBuffDim = new cl::Buffer(_cs->getContext(), CL_MEM_READ_ONLY,
 			2 * sizeof(cl_uint), NULL, NULL);
-	std::cout << "Created ColumnsDim cl::Buffer" << std::endl;
-
-	cl_uint columnsBuffDim[2] = { _columnsDim.x, _columnsDim.y };
 
         // Write dimensions of columns to _columnBuffDim
         _cs->getQueue().enqueueWriteBuffer(*_columnsBuffDim, CL_TRUE, 0,
                         2 * sizeof(cl_uint),
                         columnsBuffDim, NULL, NULL);
 
+	// Create memory-buffer for input-dimensions for each column (how many bits from the SDR it sees)
+	_columnInputBuffDim = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
+			2 * sizeof(cl_uint), NULL, NULL);
 
-	// Figure out how many proximal dendrites there should be (Connections from input-SDR to neurons)
-	// Depends on how we want to calculate the field of view.
-	// If it's an image, we may not care that much about what's going on towards the edges of the picture,
-	// then we can "fade out" the number of columns the closer to the edge we get.
-	// Assuming this now. Just remove half the size of the columns receptive field on each end of the image.
-	//
-	// Multiply size of SDR by the input each column sees. (input.size * columnInput)
-	_distalDendritesDim = Vec2i(_input->getSDRDim().x * _columnInputDim.x, _input->getSDRDim().y * _columnInputDim.y);
-	
-	// Create buffer to store distal dendrites in
-	_distalDendrites = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
-			_distalDendritesDim.x * _distalDendritesDim.y * sizeof(uint8_t), NULL, NULL);
-	std::cout << "Created distalDendrites cl::Buffer of size: " << _distalDendritesDim.x * _distalDendritesDim.y << std::endl;
+	// Create buffer to store proximal dendrites in
+	_proximalDendritesBuff = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
+			_proximalDendritesDim.x * _proximalDendritesDim.y * sizeof(uint8_t), NULL, NULL);
 
-	// Will need wrap-around on edges.
+	// Create memory-buffer for proximal dendrites dimensions (x, y)
+	_proximalDendritesBuffDim = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
+			2 * sizeof(cl_uint), NULL, NULL);
+
+	// Write column input-dimensions to buffer
+	int clret = _cs->getQueue().enqueueWriteBuffer(*_columnInputBuffDim, CL_TRUE, 0,
+			2 * sizeof(cl_uint), columnInputBuffRadius, NULL, NULL);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] write buffer failed: " + std::to_string(clret)));
 	
-	
+	// Write proximalDendrites to cl device
+	clret = _cs->getQueue().enqueueWriteBuffer(*_proximalDendritesBuff, CL_TRUE, 0,
+			_proximalDendritesDim.x * _proximalDendritesDim.y * sizeof(uint8_t),
+		       proximalDendritesBuffRand, NULL, NULL);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] write random values to _proximalDendritesBuff failed: " + std::to_string(clret)));
+
+	// It's sent of, delete data (free memory)
+	delete proximalDendritesBuffRand;
+
+        // Write dimensions of columns to _columnBuffDim
+        _cs->getQueue().enqueueWriteBuffer(*_proximalDendritesBuffDim, CL_TRUE, 0,
+                        2 * sizeof(cl_uint),
+                        proximalDendritesBuffDim, NULL, NULL);
+
 	// Create reference to the opencl kernel for overlap calculations
-	int clret = 0;
 	_kernelOverlap = new cl::Kernel(_cp->getProgram(), "CalculateOverlap", &clret);
 	if (clret != CL_SUCCESS) {
 		throw std::runtime_error(std::string("[htm/region] Setup kernel CalculateOverlap failed, return code: " + std::to_string(clret)));
 	}
 
-	// Set the second (first is index 0) kernel argument to _sdr
-	// The first kernel argument is set in setInputData function
-	//_kernelInput2SDR->setArg(1, *_sdr);
-
-	// Only creating and setting _sdr buffer and kernel arguments here.
-	// Expecting that _inputData is set and verified by caller
-	// through setInputdata.
+	std::cout << "[htm/region] columns dimensions: " << _columnsDim.x << ", " << _columnsDim.y << std::endl;
+	std::cout << "[htm/region] Columns size: " << _columnsDim.x * _columnsDim.y << std::endl;
+	std::cout << "[htm/region] columnInputDim: " << columnInputBuffRadius[0] << ", " << columnInputBuffRadius[1] << std::endl;
+	std::cout << "[htm/region] proximalDendritesDim dimensions: " << _proximalDendritesDim.x << ", " << _proximalDendritesDim.y << std::endl;
+	std::cout << "[htm/region] proximalDendrites size: " << _proximalDendritesDim.x * _proximalDendritesDim.y << std::endl;
 }
 
 void Region::overlap()
 {
-	_kernelOverlap->setArg(0, _input->getSDRBuff());
-	_kernelOverlap->setArg(1, _input->getSDRDim());
+	int clret = 0;
+	/*
+	clret = _kernelOverlap->setArg(0, *(_input->getSDRBuff()));
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 0 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(1, *(_input->getSDRBuffDim()));
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 1 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(2, *_columnsBuff);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 2 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(3, *_columnsBuffDim);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 3 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(4, *_proximalDendritesBuff);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 4 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(5, *_proximalDendritesBuffDim);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 5 failed, return code: " + std::to_string(clret)));
+	*/
+	clret = _kernelOverlap->setArg(0, *_columnsBuff);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 0 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(1, *_columnsBuffDim);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 1 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(2, *_columnInputBuffDim);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 2 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(3, *(_input->getSDRBuff()));
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 3 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(4, *(_input->getSDRBuffDim()));
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 4 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(5, *_proximalDendritesBuff);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 5 failed, return code: " + std::to_string(clret)));
+
+	clret = _kernelOverlap->setArg(6, *_proximalDendritesBuffDim);
+	if (clret != CL_SUCCESS) throw std::runtime_error(std::string("[htm/region] kernel setarg 6 failed, return code: " + std::to_string(clret)));
+
+	std::cout << "[htm/region] About to enqueue Overlap kernel, dimensions: " << _columnsDim.x << ", " << _columnsDim.y << std::endl;
+	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelOverlap, cl::NullRange, cl::NDRange(_columnsDim.x, _columnsDim.y), cl::NullRange);
+	if (ret != CL_SUCCESS) std::cout << "[htm/region] Run kernel overlap failed, return code: " << std::to_string(ret) << std::endl;
+}
+
+void Region::stepOne()
+{
+	overlap();
 }
 
 cl::Buffer* Region::getSDRBuff()
@@ -110,6 +181,7 @@ cv::Mat Region::getSDRMat()
 	_cs->getQueue().enqueueReadBuffer(*_columnsBuff, CL_TRUE, 0,
 			_columnsDim.x * _columnsDim.y,
 			sdr.data, NULL, NULL);
+	std::cout << "pixel 0 is: " << +sdr.data[0] << std::endl;
 	return sdr;
 }
 };

@@ -15,13 +15,13 @@ namespace HTM {
 class Vec2i
 {
 	public:
-		int x, y;
+		unsigned int x, y;
 
 		Vec2i()
 			: x(16), y(16)
 		{}
 
-		Vec2i(int X, int Y)
+		Vec2i(unsigned int X, unsigned int Y)
 			: x(X), y(Y)
 		{}
 		friend std::ostream& operator<<(std::ostream& os, const Vec2i& v) {

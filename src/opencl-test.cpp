@@ -33,21 +33,27 @@ int main( int argc, char** argv )
 	cv::namedWindow("cap1_orig", cv::WINDOW_NORMAL);
 	cv::namedWindow("cap1_gray", cv::WINDOW_NORMAL);
 	cv::namedWindow("cap1_sdr", cv::WINDOW_NORMAL);
+	cv::namedWindow("Columns", cv::WINDOW_NORMAL);
 
 	// Loop forever
 	while (true) {
 		// Grab new image from webcam (data from inputlayer)
 		cap1.stepOne();
+		region.stepOne();
 		cv::Mat image = cap1.getImageMat();
-		std::cout << "Image Size: " << cap1.getDim() << ", Gray Size: " << cap1.getGrayDim() << ", SDR size: " << cap1.getSDRDim() << std::endl;
+		std::cout << "[main] Image Size: " << cap1.getDim() << ", Gray Size: " << cap1.getGrayDim() << ", SDR size: " << cap1.getSDRDim() << std::endl;
 		
 		// Grab the grayscale image
 		cv::Mat gray = cap1.getGrayMat();
-		std::cout << "Got gray mat" << std::endl;
+		std::cout << "[main] Got gray mat" << std::endl;
 
 		// Get the SDR for the Grayscale image
 		cv::Mat sdr = cap1.getSDRMat();
-		std::cout << "Got sdr mat" << std::endl;
+		std::cout << "[main] Got sdr mat" << std::endl;
+
+		// Get the active-columns output
+		cv::Mat columns = region.getSDRMat();
+		std::cout << "[main] Got sdr mat of columns" << std::endl;
 
 		// Update the windows with the new images, rescale them as well
 		cv::imshow("cap1_orig", image);
@@ -56,6 +62,8 @@ int main( int argc, char** argv )
 		cv::resizeWindow("cap1_gray", gray.cols, gray.rows);
 		cv::imshow("cap1_sdr", sdr);
 		cv::resizeWindow("cap1_sdr", sdr.cols, sdr.rows);
+		cv::imshow("Columns", columns);
+		cv::resizeWindow("Columns", columns.cols, columns.rows);
 
 		// Sleep for 10ms, not sure this is even needed as the framerate of the camera should slow us down significantly.
 		usleep(10000);

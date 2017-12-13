@@ -12,6 +12,8 @@
 #include "../inputlayer/inputlayer.h"
 #include "../utils/utils.h"
 #include <iostream>
+#include <random>
+#include <functional>
 namespace HTM {
 
 class Region
@@ -22,6 +24,7 @@ class Region
 		//cl::Buffer* getColumns();
 		//cv::Mat getColumnsMat();
 		void overlap();
+		void stepOne();
 		// Kernel: Calculate overlap
 		// Kernel: Apply Inhibition
 		// Kernel: Learn
@@ -58,11 +61,17 @@ class Region
 		// The size of the input-data that each column sees, 2x2, 3x3, 10x10, 16x16, 32x32 and so on.
 		Vec2i _columnInputDim;
 
-		// The number of proximal inputs (feed-forward from input)
-		Vec2i _distalDendritesDim;
+		// Buffer to store the size of the input-data that each column sees.
+		cl::Buffer *_columnInputBuffDim;
 
-		// Storage of distal dendrites, should be something like _input.getSdrDim()*_columnInput
-		cl::Buffer *_distalDendrites;
+		// The number of proximal inputs (feed-forward from input)
+		Vec2i _proximalDendritesDim;
+
+		// Storage of proximal dendrites, should be something like _input.getSdrDim()*_columnInput
+		cl::Buffer *_proximalDendritesBuff;
+
+		// The size of the proximal dendrites buffer
+		cl::Buffer *_proximalDendritesBuffDim;
 
 		// Kernels
 		cl::Kernel *_kernelOverlap;
