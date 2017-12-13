@@ -36,8 +36,9 @@ ComputeProgram::ComputeProgram(ComputeSystem &cs, const std::string &fileName)
 	}
 	std::vector<cl::Kernel> kernels;
 	_program.createKernels(&kernels);
-	std::cout << "Got kernels: " << std::to_string(kernels.size()) << std::endl;
+	std::cout << "[compute/compute-program] Got kernels: " << std::to_string(kernels.size()) << std::endl;
 	for (unsigned int i = 0; i < kernels.size(); i++) {
+		std::cout << "[compute/compute-program] ";
 		std::cout << std::to_string(i);
 		std::cout << ": ";
 		std::cout << kernels[i].getInfo<CL_KERNEL_FUNCTION_NAME>(NULL);
