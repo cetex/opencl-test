@@ -32,20 +32,20 @@ Camera::Camera(ComputeSystem &cs, int rows, int cols) : HTM::InputLayer(cs, rows
 	// Create opencl buffer for original image
 	_bgrImage = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			_camDim.x * _camDim.y * 3 * sizeof(uint8_t), NULL, NULL);
-	std::cout << "Created bgrImage cl::buffer buffer" << std::endl;
+	std::cout << "[inputlayer/camera] Created bgrImage cl::buffer buffer" << std::endl;
 
 	// Buffer for grayscale image
 	_grayImage = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			_camDim.x * _camDim.y * sizeof(uint8_t), NULL, NULL);
 	setInputData(_grayImage);
-	std::cout << "Created InputData (Grayscale cl::Buffer) for inputlayer" << std::endl;
+	std::cout << "[inputlayer/camera] Created InputData (Grayscale cl::Buffer) for inputlayer" << std::endl;
 
 	// Set BGR2Gray parameters to original image (which is expected to be BGR)
 	// and Grayscale image (which is 1x8bit unsigned characters per pixel)	
 	_kernelBGR2Gray->setArg(0, *_bgrImage);
-	std::cout << "Set bgrImage as kernel arg 0" << std::endl;
+	std::cout << "[inputlayer/camera] Set bgrImage as kernel arg 0" << std::endl;
 	_kernelBGR2Gray->setArg(1, *_grayImage);
-	std::cout << "Set grayImage as kernel arg 1" << std::endl;
+	std::cout << "[inputlayer/camera] Set grayImage as kernel arg 1" << std::endl;
 }
 
 void Camera::captureNewImage()
@@ -54,19 +54,19 @@ void Camera::captureNewImage()
         cv::Mat tmpImage;
 
 	// Read one frame from camera into temporary image
-	std::cout << "Reading image" << std::endl;
+	std::cout << "[inputlayer/camera] Reading image" << std::endl;
         if (!device.read(tmpImage)) {
 		throw std::runtime_error(std::string("[inputlayer/camera] Could not read an image from camera device"));
 	}
-	std::cout << "Image read, got: " << tmpImage.size() << ", " << tmpImage.channels() << std::endl;
+	std::cout << "[inputlayer/camera] Image read, got: " << tmpImage.size() << ", " << tmpImage.channels() << std::endl;
 
 	// Create new cv::Mat (image) placeholder with correct size (rows (x) * cols (y))
         _image = cv::Mat(_camDim.x, _camDim.y, tmpImage.type());
 
 	// Resize original image to new image size
         cv::resize(tmpImage, _image, _image.size(), 0, 0, CV_INTER_LINEAR);
-	std::cout << "resized image" << std::endl;
-	std::cout << "Image type is: " << std::to_string(_image.type()) << std::endl;
+	std::cout << "[inputlayer/camera] resized image" << std::endl;
+	std::cout << "[inputlayer/camera] Image type is: " << std::to_string(_image.type()) << std::endl;
 }
 
 cv::Mat Camera::getImageMat()
@@ -77,15 +77,15 @@ cv::Mat Camera::getImageMat()
 void Camera::convertToGray()
 {
 	// Copy image into opencl memory buffer
-	std::cout << "Writing image to _bgrImage cl::buffer" << std::endl;
+	std::cout << "[inputlayer/camera] Writing image to _bgrImage cl::buffer" << std::endl;
 	_cs->getQueue().enqueueWriteBuffer(*_bgrImage, CL_TRUE, 0,
 			_camDim.x * _camDim.y * 3 * sizeof(uint8_t),
 			_image.data, NULL, NULL);
-	std::cout << "Wrote bgrImage to cl device, first value: " << _image.data[0] << std::endl;
+	std::cout << "[inputlayer/camera] Wrote bgrImage to cl device, first value: " << _image.data[0] << std::endl;
 
 	// Run the opencl kernel which converts it to grayscale for us
 	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelBGR2Gray, cl::NullRange, cl::NDRange(_camDim.x * _camDim.y));
-	std::cout << "Got returncode from enqueuendrangekernel: " << ret << std::endl;
+	std::cout << "[inputlayer/camera] Got returncode from enqueuendrangekernel: " << ret << std::endl;
 }
 
 void Camera::stepOne()
@@ -109,9 +109,9 @@ cv::Mat Camera::getGrayMat()
 	_cs->getQueue().enqueueReadBuffer(*_grayImage, CL_TRUE, 0,
 		_camDim.x * _camDim.y * sizeof(uint8_t),
 		gray.data, NULL, NULL);
-	std::cout << "Got image back from cl device, first value: " << gray.data[0] << std::endl;
-	std::cout << "gray is of type: " << std::to_string(gray.type()) << std::endl;
-	std::cout << "Read back grayImage" << std::endl;
+	std::cout << "[inputlayer/camera] Got image back from cl device, first value: " << gray.data[0] << std::endl;
+	std::cout << "[inputlayer/camera] gray is of type: " << std::to_string(gray.type()) << std::endl;
+	std::cout << "[inputlayer/camera] Read back grayImage" << std::endl;
 	return gray;
 }
 

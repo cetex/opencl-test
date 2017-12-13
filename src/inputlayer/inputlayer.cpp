@@ -18,7 +18,7 @@ InputLayer::InputLayer(ComputeSystem &cs, int rows, int cols)
 	_cs = &cs;
 
 	// Create instance of compute-program with the opencl code
-	_cp = new ComputeProgram(cs, std::string("kernel.cl"));
+	_cp = new ComputeProgram(cs, std::string("inputlayer.cl"));
 
 	// Create reference to opencl kernel
 	int clret = 0;
@@ -30,14 +30,14 @@ InputLayer::InputLayer(ComputeSystem &cs, int rows, int cols)
 	// Create memory-buffer for the SDR (output from inputlayer)
 	_sdrBuff = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			_sdrDim.x * _sdrDim.y * sizeof(uint8_t), NULL, NULL);
-	std::cout << "Created sdr cl::Buffer buffer of size: " << _sdrDim.x * _sdrDim.y << std::endl;
+	std::cout << "[inputlayer/inputlayer] Created sdr cl::Buffer buffer of size: " << _sdrDim.x * _sdrDim.y << std::endl;
 
 	// Create memory-buffer for the SDR Dimensions (CL::Buffer containing Size of output from inputlayer)
 	_sdrBuffDim = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			2 * sizeof(cl_uint), NULL, NULL);
-	std::cout << "Created sdr cl::Buffer buffer" << std::endl;
+	std::cout << "[inputlayer/inputlayer] Created sdr cl::Buffer buffer" << std::endl;
 
-	cl_uint sdrBuffDim[2] = { _sdrDim.x, _sdrDim.y };
+	cl_uint sdrBuffDim[2] = { (cl_uint)_sdrDim.x, (cl_uint)_sdrDim.y };
 
 	// Write SDR size to _sdrBuffDim
 	_cs->getQueue().enqueueWriteBuffer(*_sdrBuffDim, CL_TRUE, 0,
@@ -65,9 +65,9 @@ void InputLayer::setInputData(cl::Buffer *inputData)
 
 void InputLayer::input2SDR() {
 	// Run the input2SDR kernel (converts bytes to 16-bit (actually 16-byte) SDR's
-	std::cout << "About to enqueue _kernelInput2SDR" << std::endl;
+	std::cout << "[inputlayer/inputlayer] About to enqueue _kernelInput2SDR" << std::endl;
 	int ret = _cs->getQueue().enqueueNDRangeKernel(*_kernelInput2SDR, cl::NullRange, cl::NDRange(_inputDim.x * _inputDim.y));
-	std::cout << "getSDR Got returncode from enqueuendrangekernel: " << ret << std::endl;
+	std::cout << "[inputlayer/inputlayer] input2SDR Got returncode from enqueuendrangekernel: " << ret << std::endl;
 }
 
 void InputLayer::stepOne() {
