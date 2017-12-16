@@ -24,6 +24,9 @@ class Region
 		//cl::Buffer* getColumns();
 		//cv::Mat getColumnsMat();
 		void overlap();
+		void inhibit();
+		void learn();
+		void forget();
 		void stepOne();
 		// Kernel: Calculate overlap
 		// Kernel: Apply Inhibition
@@ -33,6 +36,7 @@ class Region
                 cl::Buffer* getSDRBuff();
                 cl::Buffer* getSDRBuffDim();
 		cv::Mat getSDRMat();
+		cv::Mat getDendMat();
 
 
 		Vec2i getColumnDim() {
@@ -73,13 +77,20 @@ class Region
 		// The size of the proximal dendrites buffer
 		cl::Buffer *_proximalDendritesBuffDim;
 
+		// Sparsity, for inhibition
+		unsigned int _sparsity;
+		// Stepsize, also for inhibition
+		unsigned int _stepSize;
+
+		// Inhibit StepSizeBuff
+		cl::Buffer *_stepSizeBuff;
+
 		// Kernels
 		cl::Kernel *_kernelOverlap;
-		cl::Kernel *_kernelInhibition;
-		cl::Kernel *_kernelLearning;
+		cl::Kernel *_kernelInhibit;
+		cl::Kernel *_kernelLearn;
+		cl::Kernel *_kernelForget;
 		cl::Kernel *_kernelBoost;
-
-
 
 
 	       	// Skipping temporal pooler for now.
