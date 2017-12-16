@@ -30,7 +30,7 @@ InputLayer::InputLayer(ComputeSystem &cs, int rows, int cols)
 	// Create memory-buffer for the SDR (output from inputlayer)
 	_sdrBuff = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
 			_sdrDim.x * _sdrDim.y * sizeof(uint8_t), NULL, NULL);
-	std::cout << "[inputlayer/inputlayer] Created sdr cl::Buffer buffer of size: " << _sdrDim.x * _sdrDim.y << std::endl;
+	std::cout << "[inputlayer/inputlayer] Created sdr cl::Buffer buffer of size: " << _sdrDim.x << ", " << _sdrDim.y << ", sum: " << _sdrDim.x * _sdrDim.y<< std::endl;
 
 	// Create memory-buffer for the SDR Dimensions (CL::Buffer containing Size of output from inputlayer)
 	_sdrBuffDim = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
