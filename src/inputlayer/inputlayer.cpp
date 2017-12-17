@@ -12,7 +12,9 @@ InputLayer::InputLayer(ComputeSystem &cs, int rows, int cols)
 
 	// SDR is in this setup statically set to 16 bits which means 16 uchars in this setup
 	_sdrDim.x = rows;
-	_sdrDim.y = cols * sizeof(cl_uchar16);
+	_sdrDim.y = cols;
+	// bits in SDR is 16 bits (actually 16 uchars) on horizontal (y), 1 on vertical (x)
+	_sdrBits = {1, sizeof(cl_uchar16)};
 
 	// Store compute-system for later use
 	_cs = &cs;
@@ -29,8 +31,10 @@ InputLayer::InputLayer(ComputeSystem &cs, int rows, int cols)
 
 	// Create memory-buffer for the SDR (output from inputlayer)
 	_sdrBuff = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
-			_sdrDim.x * _sdrDim.y * sizeof(uint8_t), NULL, NULL);
-	std::cout << "[inputlayer/inputlayer] Created sdr cl::Buffer buffer of size: " << _sdrDim.x << ", " << _sdrDim.y << ", sum: " << _sdrDim.x * _sdrDim.y<< std::endl;
+			_sdrDim.x * _sdrDim.y * _sdrBits.x * _sdrBits.y, NULL, NULL);
+	std::cout << "[inputlayer/inputlayer] Created sdr cl::Buffer buffer of size: " << _sdrDim.x << ", " << _sdrDim.y << 
+		", _sdrBits: " << _sdrBits.x << ", " << _sdrBits.y << 
+		", sum: " << _sdrDim.x * _sdrDim.y << " * _sdrBits" << std::endl;
 
 	// Create memory-buffer for the SDR Dimensions (CL::Buffer containing Size of output from inputlayer)
 	_sdrBuffDim = new cl::Buffer(_cs->getContext(), CL_MEM_READ_WRITE,
@@ -43,7 +47,6 @@ InputLayer::InputLayer(ComputeSystem &cs, int rows, int cols)
 	_cs->getQueue().enqueueWriteBuffer(*_sdrBuffDim, CL_TRUE, 0,
 			2 * sizeof(cl_uint),
 			sdrBuffDim, NULL, NULL);
-
 
 	// Set the second (first is index 0) kernel argument to _sdr
 	// The first kernel argument is set in setInputData function
@@ -81,11 +84,11 @@ cv::Mat InputLayer::getSDRMat()
 {
 	// Create placeholder for returned grayscale image from opencl (8-bit Unsigned Char, 1 colour-channel)
 	// Returned data will in reality be binary, 1 or 0.
-	cv::Mat sdr = cv::Mat(_sdrDim.x, _sdrDim.y, CV_8UC1);
+	cv::Mat sdr = cv::Mat(_sdrDim.x * _sdrBits.x, _sdrDim.y * _sdrBits.y, CV_8UC1);
 
 	// Read back SDR data from SDR buffer
 	_cs->getQueue().enqueueReadBuffer(*_sdrBuff, CL_TRUE, 0,
-			_sdrDim.x * _sdrDim.y,
+			_sdrDim.x * _sdrBits.x * _sdrDim.y * _sdrBits.y,
 			sdr.data, NULL, NULL);
 	return sdr;
 }

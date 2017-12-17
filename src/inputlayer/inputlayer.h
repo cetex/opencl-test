@@ -35,6 +35,9 @@ class InputLayer
 		Vec2i getSDRDim() {
 			return _sdrDim;
 		}
+		Vec2i getSDRBits() {
+			return _sdrBits;
+		}
 	protected:
 		ComputeSystem *_cs = NULL;
 	private: 
@@ -45,6 +48,7 @@ class InputLayer
 		cl::Buffer *_sdrBuffDim;
 		Vec2i _inputDim;
 		Vec2i _sdrDim;
+		Vec2i _sdrBits;
 };
 };
 #endif

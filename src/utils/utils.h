@@ -28,6 +28,15 @@ class Vec2i
 			os << v.x << "," << v.y;
 			return os;
 		}
+		
+		friend Vec2i operator+(const Vec2i &a, const Vec2i &b) {
+			return Vec2i(	a.x + b.x,
+					a.y + b.y);
+		}
+		friend Vec2i operator*(const Vec2i &a, const Vec2i &b) {
+			return Vec2i(	a.x * b.x,
+					a.y * b.y);
+		}
 };
 
 class DoubleBuffer

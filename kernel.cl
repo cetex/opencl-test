@@ -1,24 +1,25 @@
 kernel void Overlap(
 		global uchar   *columns, 
-		global uint2   *columnDim, 
-		global uint2   *columnInputDim, 
-		global uchar   *sdr, 
-		global uint2   *sdrDim, 
-		global uchar   *dendrites, 
-		global uint2   *dendritesDim) 
+		global uchar   *prevColumns,
+		       uint2   columnDim, 
+		       uint2   columnInputDim, 
+		       uint2   columnSdrMult,
+		global uchar16 *sdr, 
+		       uint2   sdrDim, 
+		global uchar16 *dendrites, 
+		       uint2   dendritesDim,
+		global uchar   *boost,
+		global uchar   *distalDendrites,
+		       uint2   distalDendritesDim)
 {
 	// Get global_id(0|1) is the position of the column.
 	private uint2 colCenter = {get_global_id(0), get_global_id(1)};
 	private uint2 colSize = {get_global_size(0), get_global_size(1)};
 
 	// copy to local memory since it's supposed to be faster
-	private uint2 _sdrDim = {
-		sdrDim->x,
-		sdrDim->y};
-
-	private uint2 _dendritesDim = {
-		dendritesDim->x,
-		dendritesDim->y};
+	// Divide y by 16 since we're using uchar16
+	sdrDim.y = sdrDim.y / 16;
+	dendritesDim.y = dendritesDim.y/16;
 
 	// Column dendrite threshold
 	const uchar dendThresh = 127;
@@ -26,44 +27,28 @@ kernel void Overlap(
 	// Store the number of active inputs
 	private uchar active = 0;
 
-	private int2 sdrMult = {
-		_sdrDim.x / columnDim->x,
-		_sdrDim.y / columnDim->y};
+	private uint2 sdrCenter = {
+		colCenter.x / columnSdrMult.x,
+		colCenter.y / columnSdrMult.y};
 
-	// DEBUG, set column pixels to black
-	columns[colCenter.x * colSize.y + colCenter.y] = 0;
+	private float2 dendStart = {
+		colCenter.x * columnInputDim.x * dendritesDim.y,
+		colCenter.y * columnInputDim.y};
 
-	private int2 sdrStart = {
-		colCenter.x * sdrMult.x,
-		colCenter.y * sdrMult.y};
-	
-	private int2 dendStart = {
-		colCenter.x * columnInputDim->x * _dendritesDim.y,
-		colCenter.y * columnInputDim->y};
+	private int dendSize = dendritesDim.x * dendritesDim.y;
 
-	for (private int x = 0; x <= columnInputDim->x; x++) {
-		for (private int y = 0; y<= columnInputDim->y; y++) {
-			// SDR may be smaller than columns, therefore we need to
-			// check if we're out of bounds (on the larger side)
-			private int2 sdrXY = {
-				sdrStart.x + x,
-				sdrStart.y + y};
-			if (sdrXY.x >= _sdrDim.x) {
-				// out of bounds (expected for columns close to bottom)
-				continue;
+	for (private int x = 0; x < columnInputDim.x; x++) {
+		for (private int y = 0; y< columnInputDim.y; y++) {
+			
+			private int sdrPos = (sdrCenter.x + x) * sdrDim.y + (sdrCenter.y + y);
+			private int dendPos = dendStart.x + dendritesDim.y * x + dendStart.y +y;
 
-			}
-			if (sdrXY.y >= _sdrDim.y) {
-				// out of bounds (expected for columns close to right boundary)
-				continue;
-			}
-
-			uint sdrPos = sdrXY.x * _sdrDim.y + sdrXY.y;
-			uint dendPos = dendStart.x + _dendritesDim.y * x + dendStart.y + y;
-			if (sdr[sdrPos] > 0 && dendrites[dendPos] > dendThresh) active++;
+			private uchar16 _active16 = sdr[sdrPos] & dendrites[dendPos];
+			for (private int i = 0; i < 16; i++) 
+				if (_active16[i] > dendThresh) active++;
 		}
 	}
-	columns[colCenter.x * colSize.y + colCenter.y] = active;
+	columns[colCenter.x * colSize.y + colCenter.y] = active + boost[colCenter.x * colSize.y + colCenter.y];
 }
 
 
@@ -71,22 +56,22 @@ kernel void Overlap(
 // stepsize is columns dimensions * 0.02
 kernel void Inhibit(
 		global uchar *columns, 
-		global uint2 *columnsDim,
-		global uint  *stepsize) 
+		       uint2 columnsDim,
+		       uint  stepsize) 
 {
 	// Get id
-	private uint id = get_global_id(0);
+	private float id = get_global_id(0);
 
 	// Store the winning active input
-	private int winner = -1;
+	private float winner = -1;
 
 	// We're not taking spatial closeness into account, we're just finding the single winning column
 	// through searching our small part of the column-space.
-	private uint startpos = (*stepsize) * id;
-	private uint endpos   = (*stepsize) * (id +1);
+	private float startpos = stepsize * id;
+	private float endpos   = stepsize * (id +1);
 	// Make sure we're within bounds
-	if (endpos >= columnsDim->x * columnsDim->y) {
-		endpos = columnsDim->x * columnsDim->y;
+	if (endpos >= columnsDim.x * columnsDim.y) {
+		endpos = columnsDim.x * columnsDim.y;
 	}
 
 	// Loop through all columns from startpos to endpos, find winner, set everyone else to 0
@@ -103,48 +88,21 @@ kernel void Inhibit(
 			columns[i] = 0;
 		}
 	}
-
 }
-//kernel void Inhibit(
-//		global uchar *columns, 
-//		global uint2 *columnsDim,
-//		global uint  *stepsize) 
-//{
-//	// Get id
-//	private uint id = get_global_id(0);
-//
-//	// Store the winning active input
-//	private int winner = -1;
-//
-//	// We're not taking spatial closeness into account, we're just finding the single winning column
-//	// through searching our small part of the column-space.
-//	private uint startpos = *stepsize * id;
-//	private uint endpos   = *stepsize * (id +1);
-//	// Loop through all columns from startpos to endpos, find winner, set everyone else to 0
-//	for (private int i = startpos; i < endpos; i++) {
-//		if (columns[i] > winner)
-//		{
-//			winner = columns[i];
-//		};
-//	}
-//
-//	for (private int i = startpos; i < endpos; i++) {
-//		if (columns[i] < winner)
-//	       	{
-//			columns[i] = 0;
-//		}
-//	}
-//
-//}
 
 kernel void Learn(
 		global uchar   *columns, 
-		global uint2   *columnDim, 
-		global uint2   *columnInputDim, 
-		global uchar   *sdr, 
-		global uint2   *sdrDim, 
-		global uchar   *dendrites, 
-		global uint2   *dendritesDim) 
+		global uchar   *prevColumns, 
+		       uint2   columnDim, 
+		       uint2   columnInputDim, 
+		       uint2   columnSdrMult,
+		global uchar16 *sdr, 
+		       uint2   sdrDim, 
+		global uchar16 *dendrites, 
+		       uint2   dendritesDim,
+		global uchar   *boost,
+		global uchar   *distalDendrites,
+		       uint2   distalDendritesDim)
 {
 	// Get global_id(0|1) is the position of the column.
 	private uint2 colCenter = {get_global_id(0), get_global_id(1)};
@@ -152,47 +110,58 @@ kernel void Learn(
 	
 	// Exit early if we're not active.
 	// Should implement boosting here.
-	if (columns[colCenter.x * colSize.y + colCenter.y] == 0) return;
+	if (columns[colCenter.x * colSize.y + colCenter.y] == 0) {
+	       boost[colCenter.x * colSize.y + colCenter.y] +=1;
+       	       return;
+	}
+	boost[colCenter.x * colSize.y + colCenter.y] = 0;
 
-	private int sdrMultX = sdrDim->x / columnDim->x;
-	private int sdrMultY = sdrDim->y / columnDim->y;
+	// copy to local memory since it's supposed to be faster
+	// Divide y by 16 since we're using uchar16
+	sdrDim.y = sdrDim.y / 16;
+	dendritesDim.y = dendritesDim.y/16;
 
-	// DEBUG, set column pixels to black
-	columns[colCenter.x * colSize.y + colCenter.y] = 0;
+	private uint2 sdrCenter = {
+		colCenter.x / columnSdrMult.x,
+		colCenter.y / columnSdrMult.y};
 
-	private int2 dendStart = {
-		colCenter.x * columnInputDim->x * dendritesDim->y,
-		colCenter.y * columnInputDim->y};
+	private float2 dendStart = {
+		colCenter.x * columnInputDim.x * dendritesDim.y,
+		colCenter.y * columnInputDim.y};
 
-	for (private int x = 0; x <= columnInputDim->x; x++) {
-		for (private int y = 0; y<= columnInputDim->y; y++) {
-			// SDR may be smaller than columns, therefore we need to
-			// check if we're out of bounds (on the larger side)
-			uint sdrX = colCenter.x * sdrMultX + x;
-			if (sdrX > sdrDim->x) {
-				sdrX = sdrX - sdrDim->x;
+	private int dendSize = dendritesDim.x * dendritesDim.y;
+
+	for (private int x = 0; x < columnInputDim.x; x++) {
+		for (private int y = 0; y< columnInputDim.y; y++) {
+			
+			private int sdrPos = (sdrCenter.x + x) * sdrDim.y + (sdrCenter.y + y);
+			private int dendPos = dendStart.x + dendritesDim.y * x + dendStart.y +y;
+
+			private uchar16 _sdr16 = sdr[sdrPos];
+			private uchar16 _dend16 = dendrites[dendPos];
+			/*
+			private uchar16 update = _dend16 > (uchar16){248, 248, 248, 248, 248, 248, 248, 248, 248, 248, 248, 248, 248, 248, 248, 248} ? // are we close to overflowing
+				_sdr16 & _dend16 : // close to overflowing, won't add more weight.
+				_sdr16 & (_dend16 + (uchar16){10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10}); // not overflowing, add weight.
+			update = _dend16 < (uchar16){5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5} ? // are we close to underflowing?
+				update : // close to underflowing, won't subtract more weights
+				update + (~_sdr16 & (_dend16 - (uchar16){5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5})); // not underflowing, subtract more weight.
+			*/
+			for (private int i = 0; i < 16; i++) {
+				//update[i] = _dend16[i] > 248 ? _sdr16[i] & _dend16[i] : _sdr16[i] & (_dend16[i] + 10);
+				//update[i] = _dend16[i] < 5 ? update[i] : update[i] + (~_sdr16[i] & (_dend16[i] -5));
+				if (_sdr16[i] > 0 && _dend16[i] < 248) {
+					_dend16[i] += 5;
+				}
+				if (_sdr16[i] == 0 && _dend16[i] >5) {
+					_dend16[i] -= 1;
+				}
 			}
-			uint sdrY = colCenter.y * sdrMultY + y;
-			if (sdrY > sdrDim->y) {
-				sdrY = sdrY - sdrDim->y;
-			}
 
-			//uint sdrPos = sdrStart.x + sdrDim->y * x + sdrStart.y + y;
-			uint sdrPos = sdrX * sdrDim->y + sdrY;
-			uint dendPos = dendStart.x + dendritesDim->y * x + dendStart.y + y;
-			if (sdr[sdrPos] > 0) {
-				// Synapse is active, increase permanence by 10%
-				dendrites[dendPos] += 10;
-			}
+			dendrites[dendPos] = _dend16;
+
+
 		}
 	}
 	columns[colCenter.x * colSize.y + colCenter.y] = 255;
 }
-
-kernel void Forget(global uchar *dendrites) 
-{
-	// Get id
-	private uint2 id = {get_global_id(0), get_global_id(1)};
-	dendrites[get_global_id(0) * get_global_size(1) + get_global_id(1)] -= 5;
-}
-
